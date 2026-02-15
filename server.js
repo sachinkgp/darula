@@ -25,7 +25,7 @@ const port = process.env.PORT || 3000;
       // Stop Docker containers
       // await dockerManager.stop();
       
-      console.log('✅ Graceful shutdown complete');
+      console.log('✅ Graceful shutdown completed');
       process.exit(0);
     });
 
