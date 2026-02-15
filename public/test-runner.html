@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test Runner - Darula</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #38a169;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        select {
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 16px;
+            min-width: 200px;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.info {
+            background: #bee3f8;
+            color: #2c5282;
+            border-left: 4px solid #3182ce;
+        }
+
+        .status.success {
+            background: #c6f6d5;
+            color: #22543d;
+            border-left: 4px solid #38a169;
+        }
+
+        .status.error {
+            background: #fed7d7;
+            color: #742a2a;
+            border-left: 4px solid #e53e3e;
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .test-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+        }
+
+        .summary-card.total {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .summary-card.passed {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        }
+
+        .summary-card.failed {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        }
+
+        .summary-card.skipped {
+            background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+        }
+
+        .summary-card h3 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        .summary-card p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .test-suites {
+            margin-top: 30px;
+        }
+
+        .test-suite {
+            background: #f7fafc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #cbd5e0;
+        }
+
+        .test-suite.passed {
+            border-left-color: #48bb78;
+        }
+
+        .test-suite.failed {
+            border-left-color: #f56565;
+        }
+
+        .test-suite-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .test-suite-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .test-suite-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .test-suite-status.passed {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .test-suite-status.failed {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .test-case {
+            padding: 12px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 6px;
+            border-left: 3px solid #cbd5e0;
+        }
+
+        .test-case.passed {
+            border-left-color: #48bb78;
+        }
+
+        .test-case.failed {
+            border-left-color: #f56565;
+        }
+
+        .test-case-name {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .test-case-duration {
+            font-size: 0.85em;
+            color: #718096;
+            margin-top: 5px;
+        }
+
+        .test-error {
+            background: #fed7d7;
+            color: #742a2a;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .no-results svg {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 API Test Runner</h1>
+            <p>Run and monitor your API test cases</p>
+            <div style="margin-top: 15px;">
+                <a href="/" style="color: white; text-decoration: none; background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 6px; font-weight: 600;">🥃 Go to Ecommerce UI</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="controls">
+                <select id="testFileSelect">
+                    <option value="">All Tests</option>
+                </select>
+                <button class="btn btn-primary" id="runTestsBtn" onclick="runTests()">
+                    Run Tests
+                </button>
+                <button class="btn btn-secondary" id="refreshFilesBtn" onclick="loadTestFiles()">
+                    Refresh Test Files
+                </button>
+            </div>
+
+            <div id="status" class="status"></div>
+
+            <div id="results" class="results" style="display: none;">
+                <div class="test-summary" id="testSummary"></div>
+                <div class="test-suites" id="testSuites"></div>
+            </div>
+
+            <div id="noResults" class="no-results">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h2>No tests run yet</h2>
+                <p>Select a test file and click "Run Tests" to get started</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1/test-runner';
+
+        // Test connection on page load
+        async function testConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    console.log('✅ Test runner API is accessible');
+                } else {
+                    console.warn('⚠️ Test runner API returned non-OK status:', response.status);
+                }
+            } catch (error) {
+                console.error('❌ Cannot connect to test runner API:', error);
+                showStatus('error', `Cannot connect to server. Make sure the server is running on port ${window.location.port || 3000}. Error: ${error.message}`);
+            }
+        }
+
+        // Load test files on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded, initializing...');
+            console.log('API_BASE:', API_BASE);
+            testConnection();
+            // Small delay to ensure everything is ready
+            setTimeout(() => {
+                loadTestFiles();
+            }, 100);
+        });
+
+        async function loadTestFiles() {
+            try {
+                console.log('Loading test files from:', `${API_BASE}/files`);
+                const response = await fetch(`${API_BASE}/files`);
+                
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error('Error response:', errorData);
+                    throw new Error(`HTTP ${response.status}: ${errorData.error || errorData.message || 'Failed to fetch'}`);
+                }
+                
+                const data = await response.json();
+                console.log('Received data:', data);
+                
+                if (data.success) {
+                    const select = document.getElementById('testFileSelect');
+                    
+                    if (!select) {
+                        console.error('Select element not found!');
+                        throw new Error('Test file select dropdown not found in DOM');
+                    }
+                    
+                    // Clear existing options except "All Tests"
+                    select.innerHTML = '<option value="">All Tests</option>';
+                    
+                    if (data.testFiles && data.testFiles.length > 0) {
+                        console.log(`Found ${data.testFiles.length} test files:`, data.testFiles);
+                        data.testFiles.forEach(file => {
+                            const option = document.createElement('option');
+                            option.value = file.path;
+                            option.textContent = file.name;
+                            select.appendChild(option);
+                        });
+                        console.log('Test files loaded into dropdown');
+                        // Clear any error status if files loaded successfully
+                        const statusDiv = document.getElementById('status');
+                        if (statusDiv) {
+                            statusDiv.classList.remove('show');
+                        }
+                    } else {
+                        console.warn('No test files in response');
+                        showStatus('info', 'No test files found. Make sure test files exist in src/__tests__/');
+                    }
+                } else {
+                    console.error('API returned success: false', data);
+                    throw new Error(data.error || data.message || 'Failed to load test files');
+                }
+            } catch (error) {
+                console.error('Error loading test files:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    API_BASE: API_BASE
+                });
+                showStatus('error', `Failed to load test files: ${error.message}. Make sure the server is running on port ${window.location.port || 3000}.`);
+            }
+        }
+
+        async function runTests() {
+            const testFile = document.getElementById('testFileSelect').value;
+            const runBtn = document.getElementById('runTestsBtn');
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            const noResultsDiv = document.getElementById('noResults');
+
+            // Disable button and show loading
+            runBtn.disabled = true;
+            runBtn.innerHTML = '<span class="loading"></span> Running Tests...';
+            
+            showStatus('info', 'Running tests... This may take a moment.');
+
+            try {
+                const response = await fetch(`${API_BASE}/run`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ testFile })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus('success', 'Tests completed successfully!');
+                    displayResults(data.testResults);
+                    resultsDiv.style.display = 'block';
+                    noResultsDiv.style.display = 'none';
+                } else {
+                    showStatus('error', 'Tests failed or encountered errors. Check results below.');
+                    displayResults(data.testResults, data.errorOutput);
+                    resultsDiv.style.display = 'block';
+                    noResultsDiv.style.display = 'none';
+                }
+            } catch (error) {
+                showStatus('error', 'Failed to run tests: ' + error.message);
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = 'Run Tests';
+            }
+        }
+
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type} show`;
+            statusDiv.textContent = message;
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusDiv.classList.remove('show');
+                }, 5000);
+            }
+        }
+
+        function displayResults(testResults, errorOutput) {
+            if (!testResults) {
+                document.getElementById('testSummary').innerHTML = '<p>No test results available</p>';
+                if (errorOutput) {
+                    document.getElementById('testSuites').innerHTML = `<div class="test-error">${errorOutput}</div>`;
+                }
+                return;
+            }
+
+            // Display summary
+            displaySummary(testResults);
+            
+            // Display test suites
+            displayTestSuites(testResults, errorOutput);
+        }
+
+        function displaySummary(results) {
+            const summary = document.getElementById('testSummary');
+            const numTotalTests = results.numTotalTests || 0;
+            const numPassedTests = results.numPassedTests || 0;
+            const numFailedTests = results.numFailedTests || 0;
+            const numPendingTests = results.numPendingTests || 0;
+
+            summary.innerHTML = `
+                <div class="summary-card total">
+                    <h3>${numTotalTests}</h3>
+                    <p>Total Tests</p>
+                </div>
+                <div class="summary-card passed">
+                    <h3>${numPassedTests}</h3>
+                    <p>Passed</p>
+                </div>
+                <div class="summary-card failed">
+                    <h3>${numFailedTests}</h3>
+                    <p>Failed</p>
+                </div>
+                <div class="summary-card skipped">
+                    <h3>${numPendingTests}</h3>
+                    <p>Skipped</p>
+                </div>
+            `;
+        }
+
+        function displayTestSuites(results, errorOutput) {
+            const suitesDiv = document.getElementById('testSuites');
+            
+            if (!results.testResults || results.testResults.length === 0) {
+                suitesDiv.innerHTML = '<p>No test suites found</p>';
+                if (errorOutput) {
+                    suitesDiv.innerHTML += `<div class="test-error">${errorOutput}</div>`;
+                }
+                return;
+            }
+
+            let html = '';
+            
+            results.testResults.forEach(suite => {
+                const status = suite.status;
+                const statusClass = status === 'passed' ? 'passed' : 'failed';
+                
+                html += `
+                    <div class="test-suite ${statusClass}">
+                        <div class="test-suite-header">
+                            <div class="test-suite-name">${suite.name}</div>
+                            <div class="test-suite-status ${statusClass}">${status.toUpperCase()}</div>
+                        </div>
+                        <div style="margin-bottom: 10px; color: #718096; font-size: 0.9em;">
+                            Duration: ${(suite.endTime - suite.startTime) / 1000}s
+                        </div>
+                `;
+
+                if (suite.assertionResults && suite.assertionResults.length > 0) {
+                    suite.assertionResults.forEach(test => {
+                        const testStatus = test.status;
+                        const testStatusClass = testStatus === 'passed' ? 'passed' : 'failed';
+                        
+                        html += `
+                            <div class="test-case ${testStatusClass}">
+                                <div class="test-case-name">${test.title}</div>
+                                ${test.failureMessages && test.failureMessages.length > 0 ? 
+                                    `<div class="test-error">${test.failureMessages.join('\n')}</div>` : ''}
+                                <div class="test-case-duration">${test.duration}ms</div>
+                            </div>
+                        `;
+                    });
+                }
+
+                html += '</div>';
+            });
+
+            if (errorOutput) {
+                html += `<div class="test-error">${errorOutput}</div>`;
+            }
+
+            suitesDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Darula - Premium Whiskey Store</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>🥃 Darula</h1>
+            </div>
+            <div class="nav-links">
+                <a href="#" onclick="showView('products')" class="nav-link">Products</a>
+                <a href="#" onclick="showView('cart')" class="nav-link" id="cartLink">
+                    Cart <span class="cart-badge" id="cartBadge">0</span>
+                </a>
+                <div id="authButtons">
+                    <button onclick="showView('login')" class="btn btn-outline">Login</button>
+                    <button onclick="showView('signup')" class="btn btn-primary">Sign Up</button>
+                </div>
+                <div id="userMenu" style="display: none;">
+                    <span id="userName" class="user-name"></span>
+                    <button onclick="showView('orders')" class="btn btn-outline">Orders</button>
+                    <button onclick="logout()" class="btn btn-outline">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Loading Spinner -->
+        <div id="loading" class="loading-overlay" style="display: none;">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Signup View -->
+        <div id="signupView" class="view" style="display: none;">
+            <div class="auth-container">
+                <h2>Create Account</h2>
+                <form id="signupForm" onsubmit="handleSignup(event)">
+                    <input type="text" placeholder="First Name" id="signupFirstName" required>
+                    <input type="text" placeholder="Last Name" id="signupLastName" required>
+                    <input type="email" placeholder="Email" id="signupEmail" required>
+                    <input type="password" placeholder="Password" id="signupPassword" required>
+                    <input type="tel" placeholder="Phone (optional)" id="signupPhone">
+                    <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
+                </form>
+                <p class="auth-switch">Already have an account? <a href="#" onclick="showView('login')">Login</a></p>
+                <div id="signupError" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Login View -->
+        <div id="loginView" class="view" style="display: none;">
+            <div class="auth-container">
+                <h2>Login</h2>
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <input type="email" placeholder="Email" id="loginEmail" required>
+                    <input type="password" placeholder="Password" id="loginPassword" required>
+                    <button type="submit" class="btn btn-primary btn-block">Login</button>
+                </form>
+                <p class="auth-switch">Don't have an account? <a href="#" onclick="showView('signup')">Sign Up</a></p>
+                <div id="loginError" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Products View -->
+        <div id="productsView" class="view">
+            <div class="container">
+                <div class="page-header">
+                    <h2>Premium Whiskey Collection</h2>
+                    <div class="filters">
+                        <select id="categoryFilter" onchange="filterProducts()">
+                            <option value="">All Categories</option>
+                        </select>
+                        <input type="text" id="searchInput" placeholder="Search products..." onkeyup="searchProducts()">
+                    </div>
+                </div>
+                <div id="productsGrid" class="products-grid">
+                    <!-- Products will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Detail View -->
+        <div id="productDetailView" class="view" style="display: none;">
+            <div class="container">
+                <button onclick="showView('products')" class="btn btn-outline back-btn">← Back to Products</button>
+                <div id="productDetail" class="product-detail">
+                    <!-- Product details will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Cart View -->
+        <div id="cartView" class="view" style="display: none;">
+            <div class="container">
+                <h2>Your Cart</h2>
+                <div id="cartContent" class="cart-content">
+                    <!-- Cart items will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Checkout View -->
+        <div id="checkoutView" class="view" style="display: none;">
+            <div class="container">
+                <h2>Checkout</h2>
+                <div class="checkout-container">
+                    <div class="checkout-form">
+                        <h3>Shipping Address</h3>
+                        <form id="checkoutForm" onsubmit="handleCheckout(event)">
+                            <input type="text" placeholder="Street Address" id="checkoutStreet" required>
+                            <input type="text" placeholder="City" id="checkoutCity" required>
+                            <input type="text" placeholder="State" id="checkoutState" required>
+                            <input type="text" placeholder="ZIP Code" id="checkoutZip" required>
+                            <input type="text" placeholder="Country" id="checkoutCountry" required>
+                            <h3>Order Summary</h3>
+                            <div id="checkoutSummary"></div>
+                            <button type="submit" class="btn btn-primary btn-block">Place Order</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders View -->
+        <div id="ordersView" class="view" style="display: none;">
+            <div class="container">
+                <h2>Your Orders</h2>
+                <div id="ordersList" class="orders-list">
+                    <!-- Orders will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Detail View -->
+        <div id="orderDetailView" class="view" style="display: none;">
+            <div class="container">
+                <button onclick="showView('orders')" class="btn btn-outline back-btn">← Back to Orders</button>
+                <div id="orderDetail" class="order-detail">
+                    <!-- Order details will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
