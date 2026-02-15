@@ -1,0 +1,30 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            # go to repo folder in home
+            cd ~/darula
+            # pull latest code
+            git pull origin main
+            # copy files to nginx web root
+            #sudo rm -rf /var/www/html/*
+            #sudo cp -r ~/docrupci/* /var/www/html/
+            # set permissions
+            #sudo chown -R www-data:www-data /var/www/html
+            # reload nginx
+            #sudo systemctl reload nginx
