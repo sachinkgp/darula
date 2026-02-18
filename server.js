@@ -42,15 +42,18 @@ const port = process.env.PORT || 3000;
 
   // Handle uncaught exceptions
   process.on('uncaughtException', async (error) => {
+    const logger = require('./src/utils/logger');
+    logger.error('Uncaught Exception', { error, errorStack: error.stack });
     console.error('❌ Uncaught Exception:', error);
-    await dockerManager.stop();
     process.exit(1);
   });
 
   // Handle unhandled promise rejections
   process.on('unhandledRejection', async (reason, promise) => {
+    const logger = require('./src/utils/logger');
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    logger.error('Unhandled Rejection', { error: err, errorStack: err.stack, promise: String(promise) });
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-    await dockerManager.stop();
     process.exit(1);
   });
 })();

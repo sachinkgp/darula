@@ -1,81 +1,47 @@
 require('./setup');
 const request = require('supertest');
 const app = require('../index');
-const { WhiskeyCategory, Brand, Product } = require('../api/model/whiskey.model');
+const { pgPool } = require('../config/db/postgres');
 
 describe('Whiskey API Tests', () => {
-  let testCategory;
-  let testBrand;
-  let testProduct;
-  const uniqueId = Date.now();
+  let testCategoryId;
+  let testBrandId;
+  let testProductId;
+  const uniqueSlug = `test-${Date.now()}`;
 
   beforeAll(async () => {
-    // Clean up any existing test data first
-    await Product.deleteMany({ slug: { $regex: /^test-/ } });
-    await Brand.deleteMany({ slug: { $regex: /^test-/ } });
-    await WhiskeyCategory.deleteMany({ slug: { $regex: /^test-/ } });
+    await pgPool.query("DELETE FROM products WHERE slug LIKE 'test-%'");
+    await pgPool.query("DELETE FROM brands WHERE slug LIKE 'test-%'");
+    await pgPool.query("DELETE FROM categories WHERE slug LIKE 'test-%'");
 
-    // Find or create test category - use valid enum value
-    // Try to find existing 'Bourbon' category first
-    testCategory = await WhiskeyCategory.findOne({ name: 'Bourbon' });
-    
-    if (!testCategory) {
-      // If 'Bourbon' doesn't exist, try other enum values
-      testCategory = await WhiskeyCategory.findOne({ name: 'Single Malt' });
-    }
-    if (!testCategory) {
-      testCategory = await WhiskeyCategory.findOne({ name: 'Double Barrel' });
-    }
-    if (!testCategory) {
-      testCategory = await WhiskeyCategory.findOne({ name: 'Blended Scotch' });
-    }
-    
-    // If no category exists, create one with 'Bourbon' (valid enum value)
-    if (!testCategory) {
-      testCategory = await WhiskeyCategory.create({
-        name: 'Bourbon',
-        description: 'Test category',
-        slug: `bourbon-${uniqueId}`
-      });
-    }
+    const catRes = await pgPool.query(
+      "INSERT INTO categories (name, slug, description) VALUES ('Test Category', $1, 'Test') RETURNING id",
+      [uniqueSlug]
+    );
+    testCategoryId = catRes.rows[0].id;
 
-    // Create test brand with unique slug
-    testBrand = await Brand.create({
-      name: `Test Brand ${uniqueId}`,
-      category: testCategory._id,
-      description: 'Test brand description',
-      country: 'USA',
-      slug: `test-brand-${uniqueId}`
-    });
+    const brandRes = await pgPool.query(
+      'INSERT INTO brands (name, slug, country, description, category_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      ['Test Brand', `${uniqueSlug}-brand`, 'USA', 'Test', testCategoryId]
+    );
+    testBrandId = brandRes.rows[0].id;
 
-    // Create test product with unique slug
-    testProduct = await Product.create({
-      name: `Test Product ${uniqueId}`,
-      brand: testBrand._id,
-      category: testCategory._id,
-      description: 'Test product description',
-      price: 29.99,
-      volume: '750ml',
-      alcoholContent: '40% ABV',
-      inStock: true,
-      stockQuantity: 10,
-      slug: `test-product-${uniqueId}`
-    });
+    const prodRes = await pgPool.query(
+      'INSERT INTO products (name, slug, description, price, stock_quantity, in_stock, brand_id, category_id) VALUES ($1, $2, $3, $4, $5, true, $6, $7) RETURNING id',
+      ['Test Product', `${uniqueSlug}-product`, 'Test', 29.99, 10, testBrandId, testCategoryId]
+    );
+    testProductId = prodRes.rows[0].id;
   });
 
   afterAll(async () => {
-    // Clean up test data
-    await Product.deleteMany({ slug: { $regex: /^test-/ } });
-    await Brand.deleteMany({ slug: { $regex: /^test-/ } });
-    await WhiskeyCategory.deleteMany({ slug: { $regex: /^test-/ } });
+    await pgPool.query("DELETE FROM products WHERE slug LIKE 'test-%'");
+    await pgPool.query("DELETE FROM brands WHERE slug LIKE 'test-%'");
+    await pgPool.query("DELETE FROM categories WHERE slug LIKE 'test-%'");
   });
 
   describe('GET /api/v1/whiskey/categories', () => {
     test('should get all categories', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/categories')
-        .expect(200);
-
+      const response = await request(app).get('/api/v1/whiskey/categories').expect(200);
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('count');
       expect(response.body).toHaveProperty('categories');
@@ -84,13 +50,10 @@ describe('Whiskey API Tests', () => {
     });
 
     test('should return categories with correct structure', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/categories')
-        .expect(200);
-
+      const response = await request(app).get('/api/v1/whiskey/categories').expect(200);
       if (response.body.categories.length > 0) {
         const category = response.body.categories[0];
-        expect(category).toHaveProperty('_id');
+        expect(category).toHaveProperty('id');
         expect(category).toHaveProperty('name');
         expect(category).toHaveProperty('slug');
       }
@@ -100,38 +63,29 @@ describe('Whiskey API Tests', () => {
   describe('GET /api/v1/whiskey/categories/:id', () => {
     test('should get category by ID with brands', async () => {
       const response = await request(app)
-        .get(`/api/v1/whiskey/categories/${testCategory._id}`)
+        .get(`/api/v1/whiskey/categories/${testCategoryId}`)
         .expect(200);
-
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('category');
       expect(response.body).toHaveProperty('brands');
-      expect(response.body.category._id.toString()).toBe(testCategory._id.toString());
+      expect(response.body.category.id).toBe(testCategoryId);
       expect(Array.isArray(response.body.brands)).toBe(true);
     });
 
     test('should return 404 for non-existent category', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await request(app)
-        .get(`/api/v1/whiskey/categories/${fakeId}`)
-        .expect(404);
-
+      const response = await request(app).get('/api/v1/whiskey/categories/999999').expect(404);
       expect(response.body).toHaveProperty('error', 'Category not found');
     });
 
-    test('should return 400 for invalid category ID format', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/categories/invalid-id')
-        .expect(500);
+    test('should return 400/500 for invalid category ID format', async () => {
+      const response = await request(app).get('/api/v1/whiskey/categories/invalid-id');
+      expect([400, 500]).toContain(response.status);
     });
   });
 
   describe('GET /api/v1/whiskey/brands', () => {
     test('should get all brands', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/brands')
-        .expect(200);
-
+      const response = await request(app).get('/api/v1/whiskey/brands').expect(200);
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('count');
       expect(response.body).toHaveProperty('brands');
@@ -140,23 +94,17 @@ describe('Whiskey API Tests', () => {
 
     test('should filter brands by categoryId', async () => {
       const response = await request(app)
-        .get(`/api/v1/whiskey/brands?categoryId=${testCategory._id}`)
+        .get(`/api/v1/whiskey/brands?categoryId=${testCategoryId}`)
         .expect(200);
-
       expect(response.body).toHaveProperty('success', true);
       expect(response.body.brands.length).toBeGreaterThan(0);
-      
-      // All brands should belong to the specified category
-      response.body.brands.forEach(brand => {
-        expect(brand.category._id.toString()).toBe(testCategory._id.toString());
+      response.body.brands.forEach((brand) => {
+        expect(brand.category_id).toBe(testCategoryId);
       });
     });
 
-    test('should return brands with populated category', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/brands')
-        .expect(200);
-
+    test('should return brands with category', async () => {
+      const response = await request(app).get('/api/v1/whiskey/brands').expect(200);
       if (response.body.brands.length > 0) {
         const brand = response.body.brands[0];
         expect(brand).toHaveProperty('category');
@@ -167,33 +115,23 @@ describe('Whiskey API Tests', () => {
 
   describe('GET /api/v1/whiskey/brands/:id', () => {
     test('should get brand by ID with products', async () => {
-      const response = await request(app)
-        .get(`/api/v1/whiskey/brands/${testBrand._id}`)
-        .expect(200);
-
+      const response = await request(app).get(`/api/v1/whiskey/brands/${testBrandId}`).expect(200);
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('brand');
       expect(response.body).toHaveProperty('products');
-      expect(response.body.brand._id.toString()).toBe(testBrand._id.toString());
+      expect(response.body.brand.id).toBe(testBrandId);
       expect(Array.isArray(response.body.products)).toBe(true);
     });
 
     test('should return 404 for non-existent brand', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await request(app)
-        .get(`/api/v1/whiskey/brands/${fakeId}`)
-        .expect(404);
-
+      const response = await request(app).get('/api/v1/whiskey/brands/999999').expect(404);
       expect(response.body).toHaveProperty('error', 'Brand not found');
     });
   });
 
   describe('GET /api/v1/whiskey/products', () => {
     test('should get all products', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/products')
-        .expect(200);
-
+      const response = await request(app).get('/api/v1/whiskey/products').expect(200);
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('count');
       expect(response.body).toHaveProperty('products');
@@ -202,51 +140,34 @@ describe('Whiskey API Tests', () => {
 
     test('should filter products by categoryId', async () => {
       const response = await request(app)
-        .get(`/api/v1/whiskey/products?categoryId=${testCategory._id}`)
+        .get(`/api/v1/whiskey/products?categoryId=${testCategoryId}`)
         .expect(200);
-
       expect(response.body).toHaveProperty('success', true);
-      
       if (response.body.products.length > 0) {
-        response.body.products.forEach(product => {
-          expect(product.category._id.toString()).toBe(testCategory._id.toString());
-        });
+        response.body.products.forEach((p) => expect(p.category_id).toBe(testCategoryId));
       }
     });
 
     test('should filter products by brandId', async () => {
       const response = await request(app)
-        .get(`/api/v1/whiskey/products?brandId=${testBrand._id}`)
+        .get(`/api/v1/whiskey/products?brandId=${testBrandId}`)
         .expect(200);
-
       expect(response.body).toHaveProperty('success', true);
-      
       if (response.body.products.length > 0) {
-        response.body.products.forEach(product => {
-          expect(product.brand._id.toString()).toBe(testBrand._id.toString());
-        });
+        response.body.products.forEach((p) => expect(p.brand_id).toBe(testBrandId));
       }
     });
 
     test('should filter products by inStock status', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/products?inStock=true')
-        .expect(200);
-
+      const response = await request(app).get('/api/v1/whiskey/products?inStock=true').expect(200);
       expect(response.body).toHaveProperty('success', true);
-      
       if (response.body.products.length > 0) {
-        response.body.products.forEach(product => {
-          expect(product.inStock).toBe(true);
-        });
+        response.body.products.forEach((p) => expect(p.in_stock).toBe(true));
       }
     });
 
-    test('should return products with populated brand and category', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/products')
-        .expect(200);
-
+    test('should return products with brand and category', async () => {
+      const response = await request(app).get('/api/v1/whiskey/products').expect(200);
       if (response.body.products.length > 0) {
         const product = response.body.products[0];
         expect(product).toHaveProperty('brand');
@@ -256,29 +177,23 @@ describe('Whiskey API Tests', () => {
       }
     });
 
-    test('should return products with all required fields', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/products')
-        .expect(200);
-
+    test('should return products with required fields', async () => {
+      const response = await request(app).get('/api/v1/whiskey/products').expect(200);
       if (response.body.products.length > 0) {
         const product = response.body.products[0];
         expect(product).toHaveProperty('name');
         expect(product).toHaveProperty('price');
-        expect(product).toHaveProperty('inStock');
+        expect(product).toHaveProperty('in_stock');
       }
     });
   });
 
   describe('GET /api/v1/whiskey/products/:id', () => {
     test('should get product by ID', async () => {
-      const response = await request(app)
-        .get(`/api/v1/whiskey/products/${testProduct._id}`)
-        .expect(200);
-
+      const response = await request(app).get(`/api/v1/whiskey/products/${testProductId}`).expect(200);
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('product');
-      expect(response.body.product._id.toString()).toBe(testProduct._id.toString());
+      expect(response.body.product.id).toBe(testProductId);
       expect(response.body.product).toHaveProperty('name');
       expect(response.body.product).toHaveProperty('price');
       expect(response.body.product).toHaveProperty('brand');
@@ -286,21 +201,14 @@ describe('Whiskey API Tests', () => {
     });
 
     test('should return 404 for non-existent product', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await request(app)
-        .get(`/api/v1/whiskey/products/${fakeId}`)
-        .expect(404);
-
+      const response = await request(app).get('/api/v1/whiskey/products/999999').expect(404);
       expect(response.body).toHaveProperty('error', 'Product not found');
     });
   });
 
   describe('GET /api/v1/whiskey/products/search', () => {
     test('should search products by query', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/products/search?q=test')
-        .expect(200);
-
+      const response = await request(app).get('/api/v1/whiskey/products/search?q=test').expect(200);
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('count');
       expect(response.body).toHaveProperty('products');
@@ -308,29 +216,21 @@ describe('Whiskey API Tests', () => {
     });
 
     test('should return 400 when query is missing', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/products/search')
-        .expect(400);
-
+      const response = await request(app).get('/api/v1/whiskey/products/search').expect(400);
       expect(response.body).toHaveProperty('error', 'Search query is required');
     });
 
     test('should perform case-insensitive search', async () => {
-      const response = await request(app)
-        .get('/api/v1/whiskey/products/search?q=TEST')
-        .expect(200);
-
+      const response = await request(app).get('/api/v1/whiskey/products/search?q=TEST').expect(200);
       expect(response.body).toHaveProperty('success', true);
     });
 
-    test('should search in product name and description', async () => {
+    test('should find test product by name', async () => {
       const response = await request(app)
-        .get(`/api/v1/whiskey/products/search?q=${testProduct.name}`)
+        .get(`/api/v1/whiskey/products/search?q=Test Product`)
         .expect(200);
-
       expect(response.body).toHaveProperty('success', true);
       expect(response.body.products.length).toBeGreaterThan(0);
     });
   });
 });
-

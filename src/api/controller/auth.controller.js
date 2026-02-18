@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const UserModel = require('../model/user.model');
+const logger = require('../../utils/logger');
 
 const authController = {
   signup: async (req, res) => {
@@ -50,12 +51,12 @@ const authController = {
         token
       });
     } catch (error) {
+      logger.error('Signup error', { requestId: req.requestId, error });
       console.error('Signup error:', error);
-      // In development, return detailed error for debugging
-      const errorMessage = process.env.NODE_ENV === 'production' 
-        ? 'Internal server error' 
+      const errorMessage = process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
         : error.message || 'Internal server error';
-      res.status(500).json({ 
+      res.status(500).json({
         error: errorMessage,
         details: process.env.NODE_ENV !== 'production' ? error.stack : undefined
       });
@@ -102,6 +103,7 @@ const authController = {
         token
       });
     } catch (error) {
+      logger.error('Login error', { requestId: req.requestId, error });
       console.error('Login error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -125,6 +127,7 @@ const authController = {
         }
       });
     } catch (error) {
+      logger.error('Get profile error', { requestId: req.requestId, error });
       console.error('Get profile error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -132,4 +135,3 @@ const authController = {
 };
 
 module.exports = authController;
-

@@ -1,446 +1,130 @@
-const mongoose = require('mongoose');
 require('dotenv').config();
-const { WhiskeyCategory, Brand, Product } = require('../api/model/whiskey.model');
+const fs = require('fs');
+const path = require('path');
+const { pgPool } = require('../config/db/postgres');
 
-const connectMongo = async () => {
+const runSchemaIfNeeded = async () => {
+  const schemaPath = path.join(__dirname, '../config/db/schema.sql');
+  const schema = fs.readFileSync(schemaPath, 'utf8');
   try {
-    await mongoose.connect(process.env.MONGO_URL);
-    console.log("✅ MongoDB connected for seeding");
-  } catch (err) {
-    console.error("❌ MongoDB connection failed:", err.message);
-    process.exit(1);
+    await pgPool.query(schema);
+  } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
   }
 };
 
+const slugify = (name) =>
+  name
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
 const seedData = async () => {
+  const client = await pgPool.connect();
   try {
-    // Clear existing data
-    await WhiskeyCategory.deleteMany({});
-    await Brand.deleteMany({});
-    await Product.deleteMany({});
+    await client.query('DELETE FROM products');
+    await client.query('DELETE FROM brands');
+    await client.query('DELETE FROM categories');
 
-    // Create Categories
-    const bourbon = await WhiskeyCategory.create({
-      name: 'Bourbon',
-      description: 'American whiskey made primarily from corn',
-      slug: 'bourbon'
-    });
+    const catResult = (name, description) =>
+      client.query(
+        'INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3) RETURNING id',
+        [name, slugify(name), description]
+      );
 
-    const singleMalt = await WhiskeyCategory.create({
-      name: 'Single Malt',
-      description: 'Whiskey made from malted barley at a single distillery',
-      slug: 'single-malt'
-    });
+    const entryBlended = (await catResult('Entry Premium Blended Scotch', 'Accessible premium blended Scotch whiskies')).rows[0].id;
+    const entrySingle = (await catResult('Entry Single Malt', 'Accessible single malt Scotch whiskies')).rows[0].id;
+    const cocktail = (await catResult('Cocktail Premium', 'Premium whiskies for cocktails')).rows[0].id;
+    const prestige = (await catResult('Prestige & gifting', 'Prestige and gifting expressions')).rows[0].id;
+    const luxury = (await catResult('Luxury collectors', 'Luxury and collector editions')).rows[0].id;
 
-    const doubleBarrel = await WhiskeyCategory.create({
-      name: 'Double Barrel',
-      description: 'Whiskey aged in two different barrels for enhanced flavor',
-      slug: 'double-barrel'
-    });
+    const brand = async (name, categoryId, country, description, slug) => {
+      const r = await client.query(
+        'INSERT INTO brands (name, slug, country, description, category_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+        [name, slug || slugify(name), country, description, categoryId]
+      );
+      return r.rows[0].id;
+    };
 
-    const blendedScotch = await WhiskeyCategory.create({
-      name: 'Blended Scotch',
-      description: 'Blend of single malt and grain whiskies from Scotland',
-      slug: 'blended-scotch'
-    });
+    const product = async (name, brandId, categoryId, price, stock, slug, description) => {
+      await client.query(
+        'INSERT INTO products (name, slug, description, price, stock_quantity, in_stock, brand_id, category_id) VALUES ($1, $2, $3, $4, $5, true, $6, $7)',
+        [name, slug || slugify(name), description || '', price, stock, brandId, categoryId]
+      );
+    };
+
+    // 1. Entry Premium Blended Scotch
+    const jwId = await brand('Johnnie Walker', entryBlended, 'Scotland', "World's best-selling Scotch");
+    const chivasId = await brand('Chivas Regal', entryBlended, 'Scotland', 'Premium blended Scotch');
+    const ballId = await brand("Ballantine's", entryBlended, 'Scotland', 'Blended Scotch whisky');
+    await product('JW Black Label', jwId, entryBlended, 39.99, 50, 'jw-black-label', '12 year old blended Scotch');
+    await product('Chivas 12', chivasId, entryBlended, 34.99, 45, 'chivas-12', 'Chivas Regal 12 Year');
+    await product("Ballantine's 12", ballId, entryBlended, 32.99, 40, 'ballantines-12', "Ballantine's 12 Year blended Scotch");
+
+    // 2. Entry Single Malt
+    const glenfiddichId = await brand('Glenfiddich', entrySingle, 'Scotland', "World's most awarded single malt");
+    const glenlivetId = await brand('The Glenlivet', entrySingle, 'Scotland', 'Speyside single malt');
+    const macallanId = await brand('The Macallan', entrySingle, 'Scotland', 'Premium single malt Scotch');
+    await product('Glenfiddich 12', glenfiddichId, entrySingle, 49.99, 35, 'glenfiddich-12', 'Glenfiddich 12 Year Old');
+    await product('Glenlivet 12', glenlivetId, entrySingle, 44.99, 38, 'glenlivet-12', 'The Glenlivet 12 Year Old');
+    await product('Macallan 12', macallanId, entrySingle, 79.99, 25, 'macallan-12', 'The Macallan 12 Year Old');
+
+    // 3. Cocktail Premium
+    const jamesonId = await brand('Jameson', cocktail, 'Ireland', 'Irish whiskey');
+    const jackId = await brand("Jack Daniel's", cocktail, 'USA', 'Tennessee whiskey');
+    const jimId = await brand('Jim Beam', cocktail, 'USA', 'Kentucky straight bourbon');
+    await product('Jameson', jamesonId, cocktail, 28.99, 60, 'jameson', 'Jameson Irish Whiskey');
+    await product("Jack Daniel's", jackId, cocktail, 29.99, 55, 'jack-daniels', "Jack Daniel's Old No. 7");
+    await product('Jim Beam', jimId, cocktail, 19.99, 70, 'jim-beam', 'Jim Beam Kentucky Straight Bourbon');
+
+    // 4. Prestige & gifting
+    const jwPrestigeId = await brand('Johnnie Walker', prestige, 'Scotland', "World's best-selling Scotch", 'johnnie-walker-prestige');
+    const chivasPrestigeId = await brand('Chivas Regal', prestige, 'Scotland', 'Premium blended Scotch', 'chivas-regal-prestige');
+    await product('JW Blue Label', jwPrestigeId, prestige, 199.99, 10, 'jw-blue-label', 'Johnnie Walker Blue Label');
+    await product('Chivas 18', chivasPrestigeId, prestige, 99.99, 15, 'chivas-18', 'Chivas Regal 18 Year');
+
+    // 5. Luxury collectors
+    const macLuxuryId = await brand('The Macallan', luxury, 'Scotland', 'Premium single malt Scotch', 'the-macallan-luxury');
+    const dalmoreId = await brand('Dalmore', luxury, 'Scotland', 'Highland single malt Scotch');
+    await product('Macallan 18', macLuxuryId, luxury, 299.99, 8, 'macallan-18', 'The Macallan 18 Year Old');
+    await product('Dalmore', dalmoreId, luxury, 89.99, 20, 'dalmore', 'Dalmore single malt Scotch');
+
+    const catCount = (await client.query('SELECT COUNT(*) FROM categories')).rows[0].count;
+    const brandCount = (await client.query('SELECT COUNT(*) FROM brands')).rows[0].count;
+    const productCount = (await client.query('SELECT COUNT(*) FROM products')).rows[0].count;
 
     console.log('✅ Categories created');
-
-    // Create Bourbon Brands
-    const jimBeam = await Brand.create({
-      name: 'Jim Beam',
-      category: bourbon._id,
-      description: 'America\'s #1 bourbon',
-      country: 'USA',
-      slug: 'jim-beam'
-    });
-
-    const makersMark = await Brand.create({
-      name: 'Maker\'s Mark',
-      category: bourbon._id,
-      description: 'Handcrafted bourbon',
-      country: 'USA',
-      slug: 'makers-mark'
-    });
-
-    const wildTurkey = await Brand.create({
-      name: 'Wild Turkey',
-      category: bourbon._id,
-      description: 'Bold and flavorful bourbon',
-      country: 'USA',
-      slug: 'wild-turkey'
-    });
-
-    const woodfordReserve = await Brand.create({
-      name: 'Woodford Reserve',
-      category: bourbon._id,
-      description: 'Premium small batch bourbon',
-      country: 'USA',
-      slug: 'woodford-reserve'
-    });
-
-    // Create Single Malt Brands
-    const macallan = await Brand.create({
-      name: 'The Macallan',
-      category: singleMalt._id,
-      description: 'Premium single malt scotch',
-      country: 'Scotland',
-      slug: 'the-macallan'
-    });
-
-    const glenfiddich = await Brand.create({
-      name: 'Glenfiddich',
-      category: singleMalt._id,
-      description: 'World\'s most awarded single malt',
-      country: 'Scotland',
-      slug: 'glenfiddich'
-    });
-
-    const glenlivet = await Brand.create({
-      name: 'The Glenlivet',
-      category: singleMalt._id,
-      description: 'The single malt that started it all',
-      country: 'Scotland',
-      slug: 'the-glenlivet'
-    });
-
-    const lagavulin = await Brand.create({
-      name: 'Lagavulin',
-      category: singleMalt._id,
-      description: 'Islay single malt with peaty character',
-      country: 'Scotland',
-      slug: 'lagavulin'
-    });
-
-    // Create Double Barrel Brands
-    const woodfordDoubleOaked = await Brand.create({
-      name: 'Woodford Reserve Double Oaked',
-      category: doubleBarrel._id,
-      description: 'Double barrel aged bourbon',
-      country: 'USA',
-      slug: 'woodford-reserve-double-oaked'
-    });
-
-    const balvenie = await Brand.create({
-      name: 'The Balvenie',
-      category: doubleBarrel._id,
-      description: 'DoubleWood single malt scotch',
-      country: 'Scotland',
-      slug: 'the-balvenie'
-    });
-
-    // Create Blended Scotch Brands
-    const johnnieWalker = await Brand.create({
-      name: 'Johnnie Walker',
-      category: blendedScotch._id,
-      description: 'World\'s best-selling scotch',
-      country: 'Scotland',
-      slug: 'johnnie-walker'
-    });
-
-    const chivasRegal = await Brand.create({
-      name: 'Chivas Regal',
-      category: blendedScotch._id,
-      description: 'Premium blended scotch',
-      country: 'Scotland',
-      slug: 'chivas-regal'
-    });
-
-    const dewars = await Brand.create({
-      name: 'Dewar\'s',
-      category: blendedScotch._id,
-      description: 'Double-aged blended scotch',
-      country: 'Scotland',
-      slug: 'dewars'
-    });
-
-    console.log('✅ Brands created');
-
-    // Create Products
-    const products = [
-      // Jim Beam products
-      {
-        name: 'Jim Beam White Label',
-        brand: jimBeam._id,
-        category: bourbon._id,
-        description: 'Classic Kentucky straight bourbon',
-        price: 19.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        inStock: true,
-        stockQuantity: 50,
-        slug: 'jim-beam-white-label'
-      },
-      {
-        name: 'Jim Beam Black Label',
-        brand: jimBeam._id,
-        category: bourbon._id,
-        description: 'Aged 8 years, extra smooth',
-        price: 29.99,
-        volume: '750ml',
-        alcoholContent: '43% ABV',
-        inStock: true,
-        stockQuantity: 30,
-        slug: 'jim-beam-black-label'
-      },
-      // Maker's Mark products
-      {
-        name: 'Maker\'s Mark',
-        brand: makersMark._id,
-        category: bourbon._id,
-        description: 'Handcrafted bourbon with red winter wheat',
-        price: 34.99,
-        volume: '750ml',
-        alcoholContent: '45% ABV',
-        inStock: true,
-        stockQuantity: 40,
-        slug: 'makers-mark'
-      },
-      {
-        name: 'Maker\'s Mark 46',
-        brand: makersMark._id,
-        category: bourbon._id,
-        description: 'Aged with seared French oak staves',
-        price: 44.99,
-        volume: '750ml',
-        alcoholContent: '47% ABV',
-        inStock: true,
-        stockQuantity: 25,
-        slug: 'makers-mark-46'
-      },
-      // Wild Turkey products
-      {
-        name: 'Wild Turkey 101',
-        brand: wildTurkey._id,
-        category: bourbon._id,
-        description: 'Bold, high-proof bourbon',
-        price: 24.99,
-        volume: '750ml',
-        alcoholContent: '50.5% ABV',
-        inStock: true,
-        stockQuantity: 35,
-        slug: 'wild-turkey-101'
-      },
-      // Woodford Reserve products
-      {
-        name: 'Woodford Reserve Distiller\'s Select',
-        brand: woodfordReserve._id,
-        category: bourbon._id,
-        description: 'Premium small batch bourbon',
-        price: 39.99,
-        volume: '750ml',
-        alcoholContent: '45.2% ABV',
-        inStock: true,
-        stockQuantity: 30,
-        slug: 'woodford-reserve-distillers-select'
-      },
-      {
-        name: 'Woodford Reserve Double Oaked',
-        brand: woodfordDoubleOaked._id,
-        category: doubleBarrel._id,
-        description: 'Double barrel aged for rich flavor',
-        price: 54.99,
-        volume: '750ml',
-        alcoholContent: '45.2% ABV',
-        inStock: true,
-        stockQuantity: 20,
-        slug: 'woodford-reserve-double-oaked'
-      },
-      // Macallan products
-      {
-        name: 'The Macallan 12 Year Old',
-        brand: macallan._id,
-        category: singleMalt._id,
-        description: 'Sherry oak matured single malt',
-        price: 79.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        age: '12 Years',
-        inStock: true,
-        stockQuantity: 15,
-        slug: 'the-macallan-12-year'
-      },
-      {
-        name: 'The Macallan 18 Year Old',
-        brand: macallan._id,
-        category: singleMalt._id,
-        description: 'Premium aged single malt',
-        price: 299.99,
-        volume: '750ml',
-        alcoholContent: '43% ABV',
-        age: '18 Years',
-        inStock: true,
-        stockQuantity: 5,
-        slug: 'the-macallan-18-year'
-      },
-      // Glenfiddich products
-      {
-        name: 'Glenfiddich 12 Year Old',
-        brand: glenfiddich._id,
-        category: singleMalt._id,
-        description: 'World\'s most awarded single malt',
-        price: 49.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        age: '12 Years',
-        inStock: true,
-        stockQuantity: 25,
-        slug: 'glenfiddich-12-year'
-      },
-      {
-        name: 'Glenfiddich 15 Year Old',
-        brand: glenfiddich._id,
-        category: singleMalt._id,
-        description: 'Solera vat matured',
-        price: 69.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        age: '15 Years',
-        inStock: true,
-        stockQuantity: 18,
-        slug: 'glenfiddich-15-year'
-      },
-      // Glenlivet products
-      {
-        name: 'The Glenlivet 12 Year Old',
-        brand: glenlivet._id,
-        category: singleMalt._id,
-        description: 'Classic Speyside single malt',
-        price: 44.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        age: '12 Years',
-        inStock: true,
-        stockQuantity: 22,
-        slug: 'the-glenlivet-12-year'
-      },
-      // Lagavulin products
-      {
-        name: 'Lagavulin 16 Year Old',
-        brand: lagavulin._id,
-        category: singleMalt._id,
-        description: 'Islay single malt with rich peaty character',
-        price: 89.99,
-        volume: '750ml',
-        alcoholContent: '43% ABV',
-        age: '16 Years',
-        inStock: true,
-        stockQuantity: 12,
-        slug: 'lagavulin-16-year'
-      },
-      // Balvenie products
-      {
-        name: 'The Balvenie DoubleWood 12 Year',
-        brand: balvenie._id,
-        category: doubleBarrel._id,
-        description: 'Aged in traditional oak and sherry casks',
-        price: 64.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        age: '12 Years',
-        inStock: true,
-        stockQuantity: 16,
-        slug: 'the-balvenie-doublewood-12-year'
-      },
-      // Johnnie Walker products
-      {
-        name: 'Johnnie Walker Red Label',
-        brand: johnnieWalker._id,
-        category: blendedScotch._id,
-        description: 'Bold and vibrant blended scotch',
-        price: 24.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        inStock: true,
-        stockQuantity: 45,
-        slug: 'johnnie-walker-red-label'
-      },
-      {
-        name: 'Johnnie Walker Black Label',
-        brand: johnnieWalker._id,
-        category: blendedScotch._id,
-        description: '12 year old blended scotch',
-        price: 39.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        age: '12 Years',
-        inStock: true,
-        stockQuantity: 35,
-        slug: 'johnnie-walker-black-label'
-      },
-      {
-        name: 'Johnnie Walker Blue Label',
-        brand: johnnieWalker._id,
-        category: blendedScotch._id,
-        description: 'Ultra-premium blended scotch',
-        price: 199.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        inStock: true,
-        stockQuantity: 8,
-        slug: 'johnnie-walker-blue-label'
-      },
-      // Chivas Regal products
-      {
-        name: 'Chivas Regal 12 Year',
-        brand: chivasRegal._id,
-        category: blendedScotch._id,
-        description: 'Premium blended scotch',
-        price: 34.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        age: '12 Years',
-        inStock: true,
-        stockQuantity: 28,
-        slug: 'chivas-regal-12-year'
-      },
-      {
-        name: 'Chivas Regal 18 Year',
-        brand: chivasRegal._id,
-        category: blendedScotch._id,
-        description: 'Ultra-premium blended scotch',
-        price: 99.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        age: '18 Years',
-        inStock: true,
-        stockQuantity: 10,
-        slug: 'chivas-regal-18-year'
-      },
-      // Dewar's products
-      {
-        name: 'Dewar\'s White Label',
-        brand: dewars._id,
-        category: blendedScotch._id,
-        description: 'Double-aged blended scotch',
-        price: 22.99,
-        volume: '750ml',
-        alcoholContent: '40% ABV',
-        inStock: true,
-        stockQuantity: 40,
-        slug: 'dewars-white-label'
-      }
-    ];
-
-    await Product.insertMany(products);
-    console.log('✅ Products created');
-
+    console.log('✅ Brands and products created');
     console.log('\n✅ Seeding completed successfully!');
-    console.log(`Created ${await WhiskeyCategory.countDocuments()} categories`);
-    console.log(`Created ${await Brand.countDocuments()} brands`);
-    console.log(`Created ${await Product.countDocuments()} products`);
+    console.log(`Created ${catCount} categories`);
+    console.log(`Created ${brandCount} brands`);
+    console.log(`Created ${productCount} products`);
 
     process.exit(0);
   } catch (error) {
     console.error('❌ Seeding error:', error);
     process.exit(1);
+  } finally {
+    client.release();
   }
 };
 
 const run = async () => {
-  await connectMongo();
+  try {
+    await pgPool.query('SELECT 1');
+    console.log('✅ PostgreSQL connected for seeding');
+  } catch (err) {
+    console.error('❌ PostgreSQL connection failed:', err.message);
+    process.exit(1);
+  }
+  try {
+    await runSchemaIfNeeded();
+    console.log('✅ Schema ensured');
+  } catch (e) {
+    if (!e.message.includes('already exists')) console.warn('Schema note:', e.message);
+  }
   await seedData();
 };
 
 run();
-
