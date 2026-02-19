@@ -92,7 +92,8 @@ const catalogModel = {
     const result = await pgPool.query(
       `SELECT p.id, p.name, p.slug, p.description, p.price, p.stock_quantity, p.in_stock, p.brand_id, p.category_id,
               b.id AS brand_id, b.name AS brand_name, b.slug AS brand_slug, b.country AS brand_country, b.description AS brand_description,
-              c.id AS cat_id, c.name AS cat_name, c.slug AS cat_slug, c.description AS cat_description
+              c.id AS cat_id, c.name AS cat_name, c.slug AS cat_slug, c.description AS cat_description,
+              (SELECT COALESCE(JSON_AGG(pi.image_url), '[]'::json) FROM product_images pi WHERE pi.product_id = p.id) AS images
        FROM products p
        LEFT JOIN brands b ON b.id = p.brand_id
        LEFT JOIN categories c ON c.id = p.category_id
@@ -108,6 +109,7 @@ const catalogModel = {
       price: parseFloat(r.price),
       stock_quantity: r.stock_quantity,
       in_stock: r.in_stock,
+      images: r.images || [],
       brand_id: r.brand_id,
       category_id: r.category_id,
       brand: r.brand_id ? { id: r.brand_id, name: r.brand_name, slug: r.brand_slug, country: r.brand_country || '', description: r.brand_description || '' } : null,
@@ -119,7 +121,8 @@ const catalogModel = {
     const result = await pgPool.query(
       `SELECT p.id, p.name, p.slug, p.description, p.price, p.stock_quantity, p.in_stock, p.brand_id, p.category_id,
               b.id AS brand_id, b.name AS brand_name, b.slug AS brand_slug, b.country AS brand_country, b.description AS brand_description,
-              c.id AS cat_id, c.name AS cat_name, c.slug AS cat_slug, c.description AS cat_description
+              c.id AS cat_id, c.name AS cat_name, c.slug AS cat_slug, c.description AS cat_description,
+              (SELECT COALESCE(JSON_AGG(pi.image_url), '[]'::json) FROM product_images pi WHERE pi.product_id = p.id) AS images
        FROM products p
        LEFT JOIN brands b ON b.id = p.brand_id
        LEFT JOIN categories c ON c.id = p.category_id
@@ -136,6 +139,7 @@ const catalogModel = {
       price: parseFloat(r.price),
       stock_quantity: r.stock_quantity,
       in_stock: r.in_stock,
+      images: r.images || [],
       brand_id: r.brand_id,
       category_id: r.category_id,
       brand: r.brand_id ? { id: r.brand_id, name: r.brand_name, slug: r.brand_slug, country: r.brand_country || '', description: r.brand_description || '' } : null,
@@ -147,7 +151,8 @@ const catalogModel = {
     const result = await pgPool.query(
       `SELECT p.id, p.name, p.slug, p.description, p.price, p.stock_quantity, p.in_stock, p.brand_id, p.category_id,
               b.id AS brand_id, b.name AS brand_name, b.slug AS brand_slug, b.country AS brand_country, b.description AS brand_description,
-              c.id AS cat_id, c.name AS cat_name, c.slug AS cat_slug, c.description AS cat_description
+              c.id AS cat_id, c.name AS cat_name, c.slug AS cat_slug, c.description AS cat_description,
+              (SELECT COALESCE(JSON_AGG(pi.image_url), '[]'::json) FROM product_images pi WHERE pi.product_id = p.id) AS images
        FROM products p
        LEFT JOIN brands b ON b.id = p.brand_id
        LEFT JOIN categories c ON c.id = p.category_id
@@ -164,6 +169,7 @@ const catalogModel = {
       price: parseFloat(r.price),
       stock_quantity: r.stock_quantity,
       in_stock: r.in_stock,
+      images: r.images || [],
       brand_id: r.brand_id,
       category_id: r.category_id,
       brand: r.brand_id ? { id: r.brand_id, name: r.brand_name, slug: r.brand_slug, country: r.brand_country || '', description: r.brand_description || '' } : null,

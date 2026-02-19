@@ -101,3 +101,27 @@ CREATE TABLE IF NOT EXISTS order_items (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Product Images
+CREATE TABLE IF NOT EXISTS product_images (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO product_images (product_id, image_url) VALUES
+(1, 'https://cdn11.bigcommerce.com/s-e8lbekfe7c/images/stencil/750w/attribute_rule_images/31953_source_1771025493.jpg?compression=lossy'),
+(2, 'https://ik.imagekit.io/cvygf2xse/chivas/wp-content/uploads/2022/05/Chivas12_NewBottle_2x.png?tr=q-80,w-446'),
+(3, 'https://cdn11.bigcommerce.com/s-e8lbekfe7c/images/stencil/750w/attribute_rule_images/33899_source_1761928839.jpg?compression=lossy'),
+(4, 'https://cdn11.bigcommerce.com/s-e8lbekfe7c/images/stencil/750w/attribute_rule_images/33057_source_1771162255.jpg?compression=lossy'),
+(5, 'https://cdn11.bigcommerce.com/s-e8lbekfe7c/images/stencil/750w/attribute_rule_images/55915_source_1771442453.jpg?compression=lossy'),
+(6, 'https://brand-assets.edrington.com/transform/4b050040-da76-4853-9fdf-ada51d9d4560/MAC-2025-Corvus-Still-photography-DC12-Serve-Bottle-4x5-150dpijpg-2xl?quality=100&io=transform%3Afill%2Cwidth%3A560%2Cheight%3A728'),
+(7, 'https://ik.imagekit.io/cvygf2xse/jamesonwhiskey/wp-content/uploads/2025/11/JO_Pack_Shot_164x632.png?tr=q-80,w-100'),
+(8, 'https://www.jackdaniels.com/_next/image?url=https%3A%2F%2Flive-jd24-backend.pantheonsite.io%2Fsites%2Fdefault%2Ffiles%2F2024-12%2FJD%2520TW%2520Global.png&w=1920&q=100'),
+(9, 'https://www.jimbeam.com/sites/default/files/styles/card_1_1/public/2024-09/jim-beam-bottle-bourbon-whiskey-white_0.png.webp?itok=81aA3RYu'),
+(10, 'https://cdn11.bigcommerce.com/s-e8lbekfe7c/images/stencil/750w/attribute_rule_images/31936_source_1770631311.jpg?compression=lossy'),
+(11, 'https://ik.imagekit.io/cvygf2xse/chivas/wp-content/uploads/2022/05/Chivas-Regal-XVIII-Bottle-front-75cl-with-emblem.png?tr=q-80,w-300'),
+(12, 'https://brand-assets.edrington.com/transform/00b930c0-1c82-42ba-bc31-532a03f8f03f/MAC-2025-Corvus-Still-photography-CC18-Serve-Bottle-Pack-4x5-150dpi-RGBjpg-2xl?quality=100&io=transform%3Afill%2Cwidth%3A560%2Cheight%3A728'),
+(12, 'https://cdn11.bigcommerce.com/s-e8lbekfe7c/images/stencil/750w/attribute_rule_images/39802_source_1771442456.jpg?compression=lossy');
